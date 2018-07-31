@@ -28,13 +28,14 @@ int main(int argc, char *argv[]) {
         num_hex_z_axis = 2;
         size_hex_z_axis = 1.0;
     }
-
-    num_hex_x_axis = atoi(argv[1]);
-    size_hex_x_axis = atof(argv[2]);
-    num_hex_y_axis = atoi(argv[3]);
-    size_hex_y_axis = atof(argv[4]);
-    num_hex_z_axis = atoi(argv[5]);
-    size_hex_z_axis = atof(argv[6]);
+    else {
+        num_hex_x_axis = atoi(argv[1]);
+        size_hex_x_axis = atof(argv[2]);
+        num_hex_y_axis = atoi(argv[3]);
+        size_hex_y_axis = atof(argv[4]);
+        num_hex_z_axis = atoi(argv[5]);
+        size_hex_z_axis = atof(argv[6]);
+    }
 
     // Inicialização do vetor contendo as coordenadas dos vértices na malha.
     const int NUM_VERTEX = (num_hex_x_axis + 1)*(num_hex_y_axis + 1)*(num_hex_z_axis + 1);
