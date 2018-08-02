@@ -9,13 +9,12 @@
 #include <cstdlib>       /* atoi, atof */
 #include <cmath>         /* ceil */
 #include "moab/Core.hpp"    /* moab::Core, moab::ErrorCode */
-#include "moab/ScdInterface.hpp"    /* moab::ScdInterface, moab::ScdBox */
 
 using namespace std;
 using namespace moab;
 
 int main(int argc, char *argv[]) {
-    ErrorCode ret;
+    ErrorCode rval;
     Core mbcore;
     int num_hex_x_axis, num_hex_y_axis, num_hex_z_axis;
     double dx, dy, dz;
@@ -23,11 +22,11 @@ int main(int argc, char *argv[]) {
     // Verificação da entrada e atribuição das variáveis.
     if (argc < 7) {
         num_hex_x_axis = 2;
-        dx = 0.1;
+        dx = 1;
         num_hex_y_axis = 2;
-        dy = 0.1;
+        dy = 1;
         num_hex_z_axis = 2;
-        dz = 0.1;
+        dz = 1;
     }
     else {
         num_hex_x_axis = atoi(argv[1]);
@@ -55,29 +54,62 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // A malha é criada usando a classe ScdInterface para malhas estruturadas,
-    // já que a malha é constituída por hexaedros regulares.
-    ScdInterface *structured_interface;
-    ret = mbcore.query_interface(structured_interface);
-    MB_CHK_SET_ERR(ret, "query_interface failed");
+    // Criando os vértices da malha
+    Range vertex_handles;
+    rval = mbcore.create_vertices(vertex_coords, NUM_VERTEX, vertex_handles);
+    MB_CHK_SET_ERR(rval, "create_vertices failed");
 
-    ScdBox *structured_box = NULL;
-    ret = structured_interface->construct_box(HomCoord(0.0, 0.0, 0.0),
-            HomCoord(ceil(num_hex_x_axis*dx), ceil(num_hex_y_axis*dy), ceil(num_hex_z_axis*dz)),
-            vertex_coords,
-            NUM_VERTEX,
-            structured_box);
-    MB_CHK_SET_ERR(ret, "construct_box failed");
+    // A matriz connectivity aramazena em cada linha os 8 vértices que compõem o hexaedro.
+    // Os oito vértices são determinados escolhendo um intervaldo de cada coordenada (x, y, z)
+    // e verificando quais vértices estão contidos na região do intervalo. Se um vértice pertence
+    // ao intervalo, então ele faz parte do hexaedro.
+    double x_inf = 0.0, x_sup = dx, y_inf = 0.0, y_sup = dy, z_inf = 0.0, z_sup = dz;
+    int m = 0, n = 0;
+    EntityHandle connectivity[NUM_HEXAHEDRA][8];
 
-    // Iterando sobre os elementos da malha.
-    for (int i = 0; i < (num_hex_x_axis + 1); i++) {
-        for (int j = 0; j < (num_hex_y_axis + 1); j++) {
-            for (int k = 0; k < (num_hex_z_axis + 1); k++) {
-                cout << "Vertex (" << i*dx << "," << j*dy << "," << k*dz << ") "
-            		  << "has handle: " << structured_box->get_vertex(i,j,k) << endl;
+    while (x_sup <= num_hex_x_axis*dx) {
+        while (y_sup <= num_hex_y_axis*dy) {
+            while (z_sup <= num_hex_z_axis*dz) {
+                n = 0;
+                for (int i = 0; i < vertex_handles.size(); i++) {
+                    double x_i = vertex_coords[3*i], y_i = vertex_coords[3*i+1], z_i = vertex_coords[3*i+2];
+                    if ((x_i >= x_inf && x_i <= x_sup) &&
+                        (y_i >= y_inf && y_i <= y_sup) &&
+                        (z_i >= z_inf && z_i <= z_sup)) {
+                            connectivity[m][n] = vertex_handles[i];
+                            n += 1;
+                    }
+                }
+                z_inf = z_sup;
+                z_sup += dz;
+                if (n == 8) m += 1;
             }
+            y_inf = y_sup;
+            y_sup += dy;
+            z_inf = 0.0;
+            z_sup = dz;
         }
+        x_inf = x_sup;
+        x_sup += dx;
+        y_inf = 0.0;
+        y_sup = dy;
     }
+
+    // Criando os elementos da malha, i.e., os hexaedros.
+    Range hex_handles;
+    EntityHandle elem;
+
+    for (int i = 0; i < NUM_HEXAHEDRA; i++) {
+        rval = mbcore.create_element(MBHEX, connectivity[i], 8, elem);
+        MB_CHK_SET_ERR(rval, "create_element failed");
+        hex_handles.insert(elem);
+    }
+    cout << "Entities created: " << hex_handles;
+
+
+    // Escrevendo os elementos da malha num arquivo.
+    rval = mbcore.write_file("my_first_mesh.vtk");
+    MB_CHK_SET_ERR(rval, "write_file failed");
 
     return 0;
 }
