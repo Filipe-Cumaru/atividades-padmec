@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     MB_CHK_SET_ERR(rval, "create_vertices failed");
 
     // A matriz connectivity aramazena em cada linha os 8 vértices que compõem o hexaedro.
-    // Os oito vértices são determinados escolhendo um intervaldo de cada coordenada (x, y, z)
+    // Os oito vértices são determinados escolhendo um intervalo de cada coordenada (x, y, z)
     // e verificando quais vértices estão contidos na região do intervalo. Se um vértice pertence
     // ao intervalo, então ele faz parte do hexaedro.
     double x_inf = 0.0, x_sup = dx, y_inf = 0.0, y_sup = dy, z_inf = 0.0, z_sup = dz;
