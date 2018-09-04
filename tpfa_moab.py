@@ -12,16 +12,16 @@ from math import ceil
 #        os elementos compartilham arestas que tem dim = 1)
 num_elem_x = 10
 num_elem_y = 3
-num_elem_z = 0
+num_elem_z = 1
 dx = 2.0
 dy = 5/3
-dz = 0
-dim = 1
+dz = 1
+dim = 2
 num_elements = 30
 
 # create_mesh_connectivity: Função para montagem da conectividade das elementos.
 # Parâmetros:
-#   - veretex_handles: vetor de EntityHandles representando vértices do MOAB.
+#   - vertex_handles: vetor de EntityHandles representando vértices do MOAB.
 #   - vertex_coords: coordenadas dos vértices
 def create_mesh_connectivity(vertex_handles, vertex_coords):
     global num_elem_x, num_elem_y, num_elem_z, dx, dy, dz, num_elements
@@ -31,7 +31,7 @@ def create_mesh_connectivity(vertex_handles, vertex_coords):
     m, n = 0, 0
 
     mesh_connectivity = np.zeros((num_elements, 8), dtype=np.uint64)
-#     Refactor here!
+
     while x_sup <= num_elem_x*dx:
         while y_sup <= num_elem_y*dy:
             while z_sup <= num_elem_z*dz:
@@ -74,25 +74,7 @@ def main():
 
     # Tratamento da entrada. O número de dimensões da malha é determinado a partir
     # da quantidade de argumentos.
-    if len(sys.argv) == 3:
-        num_elem_x = int(sys.argv[1])
-        num_elem_y = 0
-        num_elem_z = 0
-        dx = float(sys.argv[2])
-        dy = 0.0
-        dz = 0.0
-        dim = 0
-        num_elements = num_elem_x
-    elif len(sys.argv) == 5:
-        num_elem_x = int(sys.argv[1])
-        num_elem_y = int(sys.argv[3])
-        num_elem_z = 0
-        dx = float(sys.argv[2])
-        dy = float(sys.argv[4])
-        dz = 0.0
-        dim = 1
-        num_elements = num_elem_x*num_elem_y
-    elif len(sys.argv) == 7:
+    if len(sys.argv) == 7:
         num_elem_x = int(sys.argv[1])
         num_elem_y = int(sys.argv[3])
         num_elem_z = int(sys.argv[5])
@@ -101,6 +83,9 @@ def main():
         dz = float(sys.argv[6])
         dim = 2
         num_elements = num_elem_x*num_elem_y*num_elem_z
+    else:
+        print("Not enough arguments")
+        return
 
     # Criando instância da classe Core que gerencias as operações na malha.
     mbcore = core.Core()
@@ -160,6 +145,10 @@ def main():
         centroid_coord = get_centroid_coords(mbcore.get_coords([elem_vertex[0]]))
         mbcore.tag_set_data(centroid_tag, e, centroid_coord)
         mbcore.tag_set_data(permeability_tag, e, np.array([1], dtype=np.float_))
+
+    mbcore.write_file("tpfa_mesh.h5m")
+    print("New h5m file created")
+    return
 
     # Montagem da matriz de coeficientes do sistema.
     coef = np.zeros((num_elements, num_elements), dtype=np.float_)
