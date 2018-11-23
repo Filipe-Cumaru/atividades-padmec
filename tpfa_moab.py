@@ -26,33 +26,33 @@ num_elements = 30
 def create_mesh_connectivity(vertex_handles, vertex_coords):
     global num_elem_x, num_elem_y, num_elem_z, dx, dy, dz, num_elements
 
-    x_inf, y_inf, z_inf = 0, 0, 0
-    x_sup, y_sup, z_sup = dx, dy, dz
     m, n = 0, 0
-
     mesh_connectivity = np.zeros((num_elements, 8), dtype=np.uint64)
 
-    while x_sup <= num_elem_x*dx:
-        while y_sup <= num_elem_y*dy:
-            while z_sup <= num_elem_z*dz:
-                n = 0
-                for i in range(len(vertex_handles)):
-                    x, y, z = vertex_coords[3*i], vertex_coords[3*i+1], vertex_coords[3*i+2]
-                    if (x <= x_sup and x >= x_inf) and (y <= y_sup and y >= y_inf) and (z <= z_sup and z >= z_inf):
-                        mesh_connectivity[m][n] = vertex_handles[i]
-                        n += 1
-                z_inf = z_sup
-                z_sup += dz
-                if (n == 8):
-                    m += 1
-            y_inf = y_sup
-            y_sup += dy
-            z_inf = 0.0
-            z_sup = dz
-        x_inf = x_sup
-        x_sup += dx
-        y_inf = 0.0
-        y_sup = dy
+    for i in range(num_elements):
+        lower_x = ((i // (num_elem_y*num_elem_z))%num_elem_x)*dx
+        upper_x = lower_x + dx
+        lower_y = ((i // num_elem_z)%num_elem_y)*dy
+        upper_y = lower_y + dy
+        lower_z = (i % num_elem_z)*dz
+        upper_z = lower_z + dz
+        # print("Bounds\tupper\tlower\nx axis\t{0}\t{1}\ny axis\t{2}\t{3}\nz axis\t{4}\t{5}\n".format(upper_x, lower_x, upper_y, lower_y, upper_z, lower_z))
+        # n = 0
+        temp = [vertex_handles[j] for j in range(num_elements) \
+                if (vertex_coords[3*j] <= upper_x and vertex_coords[3*j] >= lower_x) and \
+                (vertex_coords[3*j+1] <= upper_y and vertex_coords[3*j+1] >= lower_y) and \
+                (vertex_coords[3*j+2] <= upper_z and vertex_coords[3*j+2] >= lower_z)]
+        if len(temp) == 8:
+            mesh_connectivity[m] = temp
+            m += 1
+        # for j in range(len(vertex_handles)):
+        #     x, y, z = vertex_coords[3*j], vertex_coords[3*j+1], vertex_coords[3*j+2]
+        #     if (x <= upper_x and x >= lower_x) and \
+        #        (y <= upper_y and y >= lower_y) and \
+        #        (z <= upper_z and z >= lower_z):
+        #        mesh_connectivity[m][n] = vertex_handles[j]
+        #        n += 1
+        # m += 1
 
     return mesh_connectivity
 
@@ -69,6 +69,7 @@ def equiv_perm(k1, k2):
 def centroid_dist(c1, c2):
     return (c1[0] + c2[0])**2 + (c1[1] + c2[1])**2 + (c1[2] + c2[2])**2
 
+
 def main():
     global num_elem_x, num_elem_y, num_elem_z, dx, dy, dz, dim, num_elements
 
@@ -83,6 +84,7 @@ def main():
         dz = float(sys.argv[6])
         dim = 2
         num_elements = num_elem_x*num_elem_y*num_elem_z
+        num_vertex = (num_elem_x+1)*(num_elem_y+1)*(num_elem_z+1)
     else:
         print("Not enough arguments")
         return
@@ -91,18 +93,21 @@ def main():
     mbcore = core.Core()
 
     # Inicializando o vetor de coordenadas dos vértices.
-    vertex_coords = np.array([])
-    for k in range(num_elem_z + 1):
-        for j in range(num_elem_y + 1):
-            for i in range(num_elem_x + 1):
-                vertex_coords = np.append(vertex_coords, [i*dx, j*dy, k*dz])
+    vertex_coords = np.zeros(num_vertex*3)
+    for i in range(num_vertex):
+        vertex_coords[3*i] = (i % (num_elem_x+1))*dx
+        vertex_coords[3*i+1] = ((i // (num_elem_x+1)) % (num_elem_y+1))*dy
+        vertex_coords[3*i+2] = ((i // ((num_elem_x+1)*(num_elem_y+1))) % (num_elem_z+1))*dz
 
     # O método create_vertices cria os handles associados a cada coordenada em vertex_coords
     vertex_handles = mbcore.create_vertices(vertex_coords)
 
     # Em mesh_connectivity são aramazenados os conjuntos de vértices que compõem um elemento,
     # ou seja, determina a conectividade dos vértices na malha.
+    print("Creating connectivity")
     mesh_connectivity = create_mesh_connectivity(vertex_handles, vertex_coords)
+    print("    Done")
+    return
 
     # De posse da conectividade da malha, criamos os elementos um a um. A troca de valores
     # nas duas primeiras linhas do laço são necessárias devido a forma como o MOAB interpreta
@@ -148,7 +153,7 @@ def main():
 
     mbcore.write_file("tpfa_mesh.h5m")
     print("New h5m file created")
-    return
+    # return
 
     # Montagem da matriz de coeficientes do sistema.
     coef = np.zeros((num_elements, num_elements), dtype=np.float_)
@@ -160,6 +165,7 @@ def main():
                 e1_tags = mbcore.tag_get_tags_on_entity(elem_handles[i])
                 e2_tags = mbcore.tag_get_tags_on_entity(elem_handles[j])
                 e1_centroid = mbcore.tag_get_data(e1_tags[0], elem_handles[i], flat=True)
+                print(e1_centroid);
                 e2_centroid = mbcore.tag_get_data(e2_tags[0], elem_handles[j], flat=True)
                 e1_perm = mbcore.tag_get_data(e1_tags[1], elem_handles[i], flat=True)[0]
                 e2_perm = mbcore.tag_get_data(e2_tags[1], elem_handles[j], flat=True)[0]
